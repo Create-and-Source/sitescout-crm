@@ -208,19 +208,19 @@ function App() {
               <tbody>
                 {leads.map(lead => (
                   <tr key={lead.id} onClick={() => setSelectedLead(lead)}>
-                    <td className="td-name">{lead.businessName || 'Unknown'}</td>
-                    <td>{lead.businessType || lead.industry || ''}</td>
-                    <td>
+                    <td className="td-name" data-label="Business">{lead.businessName || 'Unknown'}</td>
+                    <td data-label="Industry">{lead.businessType || lead.industry || ''}</td>
+                    <td data-label="Site Quality">
                       <span className={`site-quality ${lead.currentSiteQuality || 'none'}`}>
                         {lead.currentSiteQuality || 'unknown'}
                       </span>
                     </td>
-                    <td>{lead.googleMapsData?.rating || '—'}</td>
-                    <td>{lead.contact?.phone || '—'}</td>
-                    <td>
+                    <td data-label="Rating">{lead.googleMapsData?.rating || '—'}</td>
+                    <td data-label="Phone">{lead.contact?.phone || '—'}</td>
+                    <td data-label="Status">
                       <span className={`status-badge ${lead.status}`}>{lead.status}</span>
                     </td>
-                    <td>{lead.gaps?.length || 0} gaps</td>
+                    <td data-label="Gaps">{lead.gaps?.length || 0} gaps</td>
                   </tr>
                 ))}
               </tbody>

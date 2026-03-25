@@ -186,3 +186,145 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #DDD; border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* Mobile Responsive                                          */
+/* ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* Header — stack vertically */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .header-right {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .header-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .view-btn, .import-btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+  }
+
+  /* Main content */
+  .main { padding: 16px; }
+
+  /* Pipeline — stack columns vertically on mobile */
+  .pipeline {
+    flex-direction: column;
+    gap: 20px;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .pipeline-column { min-width: unset; }
+
+  /* List view — card layout instead of table */
+  .leads-table thead { display: none; }
+
+  .leads-table,
+  .leads-table tbody,
+  .leads-table tr,
+  .leads-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .leads-table tr {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    padding: 12px;
+  }
+
+  .leads-table td {
+    padding: 3px 0;
+    border-bottom: none;
+    font-size: 13px;
+  }
+
+  .leads-table td::before {
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 1px;
+  }
+
+  .leads-table td:first-child {
+    font-size: 15px;
+    font-weight: 700;
+    padding-bottom: 4px;
+  }
+
+  /* Lead detail */
+  .lead-detail { max-width: 100%; }
+
+  .detail-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .detail-header h2 { font-size: 20px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-section { padding: 16px; }
+
+  /* Buttons — full width on mobile */
+  .btn-primary, .btn-secondary {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .copy-btn { margin-right: 0; }
+  .lovable-link { width: 100%; }
+
+  /* Import modal */
+  .import-content { padding: 20px; width: 95vw; }
+  .import-actions { flex-direction: column; }
+  .import-actions button { width: 100%; }
+
+  /* Prompt box — taller on mobile for readability */
+  .prompt-box { max-height: 200px; padding: 12px; }
+  .prompt-box pre { font-size: 12px; }
+
+  /* Empty state */
+  .empty-state { padding: 40px 16px; }
+}
+
+@media (max-width: 480px) {
+  .header h1 { font-size: 16px; }
+  .header-sub { display: none; }
+
+  .stat { font-size: 11px; }
+
+  .pipeline-column { min-width: unset; }
+
+  .lead-card { padding: 12px; }
+  .lead-card-name { font-size: 13px; }
+
+  .detail-header h2 { font-size: 18px; }
+  .detail-meta { font-size: 12px; }
+}
