@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
+import { supabase } from './supabase'
 import './App.css'
 
-// ── Demo data (will be replaced by Supabase + extension sync) ──
 const PIPELINE_STAGES = [
   { key: 'scraped', label: 'Scraped', color: '#888' },
   { key: 'analyzed', label: 'Analyzed', color: '#2B6CB0' },
@@ -11,61 +11,172 @@ const PIPELINE_STAGES = [
   { key: 'converted', label: 'Converted', color: '#22543D' },
 ]
 
+// Convert extension lead format → Supabase row
+function toRow(lead) {
+  return {
+    business_name: lead.businessName || lead.business_name || 'Unknown',
+    business_type: lead.businessType || lead.business_type || '',
+    industry: lead.industry || '',
+    location: lead.location || '',
+    status: lead.status || 'scraped',
+    current_site_quality: lead.currentSiteQuality || lead.current_site_quality || '',
+    contact: lead.contact || {},
+    google_maps_data: lead.googleMapsData || lead.google_maps_data || {},
+    reviews_data: lead.reviewsData || lead.reviews_data || null,
+    scraped_data: lead.scrapedData || lead.scraped_data || null,
+    gaps: lead.gaps || [],
+    gap_summary: lead.gapSummary || lead.gap_summary || '',
+    estimated_revenue_impact: lead.estimatedRevenueImpact || lead.estimated_revenue_impact || '',
+    recommended_features: lead.recommendedFeatures || lead.recommended_features || [],
+    lovable_prompt: lead.lovablePrompt || lead.lovable_prompt || '',
+    email_subject: lead.emailSubject || lead.email_subject || '',
+    email_body: lead.emailBody || lead.email_body || '',
+  }
+}
+
+// Convert Supabase row → display format
+function fromRow(row) {
+  return {
+    id: row.id,
+    businessName: row.business_name,
+    businessType: row.business_type,
+    industry: row.industry,
+    location: row.location,
+    status: row.status,
+    currentSiteQuality: row.current_site_quality,
+    contact: row.contact || {},
+    googleMapsData: row.google_maps_data || {},
+    reviewsData: row.reviews_data,
+    scrapedData: row.scraped_data,
+    gaps: row.gaps || [],
+    gapSummary: row.gap_summary,
+    estimatedRevenueImpact: row.estimated_revenue_impact,
+    recommendedFeatures: row.recommended_features || [],
+    lovablePrompt: row.lovable_prompt,
+    emailSubject: row.email_subject,
+    emailBody: row.email_body,
+    savedAt: row.saved_at,
+  }
+}
+
 function App() {
   const [leads, setLeads] = useState([])
   const [selectedLead, setSelectedLead] = useState(null)
-  const [view, setView] = useState('pipeline') // pipeline | list
+  const [view, setView] = useState('pipeline')
   const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
   const [importText, setImportText] = useState('')
   const [showImport, setShowImport] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Load leads from localStorage on mount + listen for extension injections
+  // Load leads from Supabase on mount
   useEffect(() => {
-    const loadFromStorage = () => {
-      const saved = localStorage.getItem('sitescout_leads')
-      if (saved) {
-        try { setLeads(JSON.parse(saved)) } catch {}
-      }
-    }
-    loadFromStorage()
+    loadLeads()
 
-    // Listen for storage events (fired when extension injects leads)
-    const onStorage = () => loadFromStorage()
+    // Also check localStorage for extension injections and migrate to Supabase
+    const onStorage = () => migrateFromLocalStorage()
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // Save leads to localStorage on change
-  useEffect(() => {
-    if (leads.length > 0) {
-      localStorage.setItem('sitescout_leads', JSON.stringify(leads))
+  async function loadLeads() {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('saved_at', { ascending: false })
+
+    if (!error && data) {
+      setLeads(data.map(fromRow))
     }
-  }, [leads])
+    setLoading(false)
+  }
+
+  // Migrate leads from localStorage (extension injection) to Supabase
+  async function migrateFromLocalStorage() {
+    const saved = localStorage.getItem('sitescout_leads')
+    if (!saved) return
+
+    try {
+      const localLeads = JSON.parse(saved)
+      if (!Array.isArray(localLeads) || localLeads.length === 0) return
+
+      // Get existing business names from Supabase
+      const { data: existing } = await supabase
+        .from('leads')
+        .select('business_name')
+
+      const existingNames = new Set((existing || []).map(l => l.business_name?.toLowerCase()))
+
+      // Only insert new leads
+      const newLeads = localLeads
+        .filter(l => {
+          const name = (l.businessName || l.business_name || '').toLowerCase()
+          return name && !existingNames.has(name)
+        })
+        .map(toRow)
+
+      if (newLeads.length > 0) {
+        await supabase.from('leads').insert(newLeads)
+      }
+
+      // Update existing leads with newer data
+      for (const lead of localLeads) {
+        const name = (lead.businessName || lead.business_name || '').toLowerCase()
+        if (existingNames.has(name)) {
+          const row = toRow(lead)
+          // Only update if we have new data (like lovable_prompt)
+          if (row.lovable_prompt || row.gap_summary || row.gaps?.length > 0) {
+            await supabase
+              .from('leads')
+              .update(row)
+              .ilike('business_name', name)
+          }
+        }
+      }
+
+      // Clear localStorage after migration
+      localStorage.removeItem('sitescout_leads')
+
+      // Reload from Supabase
+      await loadLeads()
+    } catch {
+      // Silent fail
+    }
+  }
 
   // Import leads from extension (paste JSON)
-  function handleImport() {
+  async function handleImport() {
     try {
       const parsed = JSON.parse(importText)
-      const newLeads = (Array.isArray(parsed) ? parsed : [parsed]).map(l => ({
-        ...l,
-        id: l.id || crypto.randomUUID(),
-        status: l.status || 'scraped',
-      }))
-      setLeads(prev => {
-        const existing = new Set(prev.map(l => l.businessName?.toLowerCase()))
-        const unique = newLeads.filter(l => !existing.has(l.businessName?.toLowerCase()))
-        return [...unique, ...prev]
-      })
+      const newLeads = (Array.isArray(parsed) ? parsed : [parsed]).map(toRow)
+
+      // Get existing names
+      const { data: existing } = await supabase
+        .from('leads')
+        .select('business_name')
+
+      const existingNames = new Set((existing || []).map(l => l.business_name?.toLowerCase()))
+      const unique = newLeads.filter(l => !existingNames.has(l.business_name?.toLowerCase()))
+
+      if (unique.length > 0) {
+        await supabase.from('leads').insert(unique)
+      }
+
       setImportText('')
       setShowImport(false)
+      await loadLeads()
     } catch {
       alert('Invalid JSON — use "Copy All as JSON" button in the extension')
     }
   }
 
   // Update lead status
-  function updateStatus(leadId, newStatus) {
+  async function updateStatus(leadId, newStatus) {
+    await supabase
+      .from('leads')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+
     setLeads(prev => prev.map(l =>
       l.id === leadId ? { ...l, status: newStatus } : l
     ))
@@ -91,6 +202,24 @@ function App() {
     ...stage,
     leads: leads.filter(l => l.status === stage.key),
   }))
+
+  if (loading) {
+    return (
+      <div className="app">
+        <header className="header">
+          <div className="header-left">
+            <h1>SiteScout</h1>
+            <span className="header-sub">by Create & Source</span>
+          </div>
+        </header>
+        <div className="main">
+          <div className="empty-state">
+            <p>Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="app">
