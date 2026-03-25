@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import './App.css'
 
@@ -57,6 +57,143 @@ function fromRow(row) {
     emailBody: row.email_body,
     savedAt: row.saved_at,
   }
+}
+
+// ── Lead-specific Chat Widget ──
+function ChatWidget({ lead }) {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef(null)
+  const inputRef = useRef(null)
+
+  // Reset chat when lead changes
+  useEffect(() => {
+    setMessages([])
+    setInput('')
+    setLoading(false)
+  }, [lead?.id])
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  // Focus input when opened
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  async function sendMessage(e) {
+    e.preventDefault()
+    const text = input.trim()
+    if (!text || loading) return
+
+    const userMsg = { role: 'user', content: text }
+    const newMessages = [...messages, userMsg]
+    setMessages(newMessages)
+    setInput('')
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          lead,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.error) {
+        setMessages([...newMessages, { role: 'assistant', content: `Error: ${data.error}` }])
+      } else {
+        setMessages([...newMessages, { role: 'assistant', content: data.text }])
+      }
+    } catch (err) {
+      setMessages([...newMessages, { role: 'assistant', content: `Failed to connect: ${err.message}` }])
+    }
+    setLoading(false)
+  }
+
+  return (
+    <>
+      {/* Floating toggle button */}
+      <button
+        className={`chat-fab ${open ? 'chat-fab-open' : ''}`}
+        onClick={() => setOpen(!open)}
+        title={`Chat about ${lead.businessName}`}
+      >
+        {open ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        ) : (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        )}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div className="chat-panel">
+          <div className="chat-panel-header">
+            <div className="chat-panel-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>{lead.businessName}</span>
+            </div>
+            <button className="chat-panel-close" onClick={() => setOpen(false)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <div className="chat-messages">
+            {messages.length === 0 && (
+              <div className="chat-empty">
+                <p className="chat-empty-title">Ask me about {lead.businessName}</p>
+                <p className="chat-empty-sub">I know their gaps, reviews, the Lovable prompt, and the draft email. Ask me anything.</p>
+                <div className="chat-suggestions">
+                  <button onClick={() => { setInput('Is the Lovable prompt accurate for this business?'); }}>Review the Lovable prompt</button>
+                  <button onClick={() => { setInput('How can I improve the outreach email?'); }}>Improve the email</button>
+                  <button onClick={() => { setInput('What should I know before calling them?'); }}>Prep me for a call</button>
+                </div>
+              </div>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className={`chat-msg ${msg.role}`}>
+                <div className="chat-msg-bubble">
+                  {msg.content.split('\n').map((line, j) => (
+                    <span key={j}>{line}{j < msg.content.split('\n').length - 1 && <br/>}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="chat-msg assistant">
+                <div className="chat-msg-bubble chat-typing">
+                  <span className="dot"></span><span className="dot"></span><span className="dot"></span>
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <form className="chat-input-bar" onSubmit={sendMessage}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="Ask about this lead..."
+              disabled={loading}
+            />
+            <button type="submit" disabled={!input.trim() || loading}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </form>
+        </div>
+      )}
+    </>
+  )
 }
 
 function App() {
@@ -514,6 +651,9 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Chat Widget — only on lead detail */}
+        {selectedLead && <ChatWidget lead={selectedLead} />}
 
         {/* Empty state */}
         {leads.length === 0 && !selectedLead && (
