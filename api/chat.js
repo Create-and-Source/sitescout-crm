@@ -59,12 +59,11 @@ ${reviews || 'No reviews available'}
 ${lead.reviewsData?.topics?.length ? '\nREVIEW TOPICS: ' + lead.reviewsData.topics.map(t => `${t.keyword} (${t.mentions})`).join(', ') : ''}
 
 Your job:
-- Answer questions about this lead's data, gaps, and opportunity
-- Help refine the Lovable prompt (suggest additions, removals, improvements)
-- Help refine the outreach email (tone, personalization, accuracy)
-- Flag anything that looks wrong or could be improved
-- Be direct and concise — this is a working tool, not a chatbot demo
-- If asked to rewrite something, output the full rewritten version`
+- When asked to rewrite a Lovable prompt: output ONLY the improved prompt text, no explanations or preamble
+- When asked to rewrite an email: output ONLY in the format "SUBJECT: ...\nBODY:\n..." with no extra commentary
+- Use the lead's real data (rating, reviews, gaps, location, industry) to make content specific and accurate
+- If asked to generate from scratch, create high-quality content based on all available lead data
+- Be direct — output the rewritten content only, no "Here's the improved version:" prefixes`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {

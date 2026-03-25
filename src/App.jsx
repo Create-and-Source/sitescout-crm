@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import './App.css'
 
@@ -59,143 +59,6 @@ function fromRow(row) {
   }
 }
 
-// ── Lead-specific Chat Widget ──
-function ChatWidget({ lead }) {
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const bottomRef = useRef(null)
-  const inputRef = useRef(null)
-
-  // Reset chat when lead changes
-  useEffect(() => {
-    setMessages([])
-    setInput('')
-    setLoading(false)
-  }, [lead?.id])
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
-
-  // Focus input when opened
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
-
-  async function sendMessage(e) {
-    e.preventDefault()
-    const text = input.trim()
-    if (!text || loading) return
-
-    const userMsg = { role: 'user', content: text }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
-    setInput('')
-    setLoading(true)
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          lead,
-        }),
-      })
-
-      const data = await res.json()
-      if (data.error) {
-        setMessages([...newMessages, { role: 'assistant', content: `Error: ${data.error}` }])
-      } else {
-        setMessages([...newMessages, { role: 'assistant', content: data.text }])
-      }
-    } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: `Failed to connect: ${err.message}` }])
-    }
-    setLoading(false)
-  }
-
-  return (
-    <>
-      {/* Floating toggle button */}
-      <button
-        className={`chat-fab ${open ? 'chat-fab-open' : ''}`}
-        onClick={() => setOpen(!open)}
-        title={`Chat about ${lead.businessName}`}
-      >
-        {open ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        )}
-      </button>
-
-      {/* Chat panel */}
-      {open && (
-        <div className="chat-panel">
-          <div className="chat-panel-header">
-            <div className="chat-panel-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <span>{lead.businessName}</span>
-            </div>
-            <button className="chat-panel-close" onClick={() => setOpen(false)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-
-          <div className="chat-messages">
-            {messages.length === 0 && (
-              <div className="chat-empty">
-                <p className="chat-empty-title">Ask me about {lead.businessName}</p>
-                <p className="chat-empty-sub">I know their gaps, reviews, the Lovable prompt, and the draft email. Ask me anything.</p>
-                <div className="chat-suggestions">
-                  <button onClick={() => { setInput('Is the Lovable prompt accurate for this business?'); }}>Review the Lovable prompt</button>
-                  <button onClick={() => { setInput('How can I improve the outreach email?'); }}>Improve the email</button>
-                  <button onClick={() => { setInput('What should I know before calling them?'); }}>Prep me for a call</button>
-                </div>
-              </div>
-            )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`chat-msg ${msg.role}`}>
-                <div className="chat-msg-bubble">
-                  {msg.content.split('\n').map((line, j) => (
-                    <span key={j}>{line}{j < msg.content.split('\n').length - 1 && <br/>}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="chat-msg assistant">
-                <div className="chat-msg-bubble chat-typing">
-                  <span className="dot"></span><span className="dot"></span><span className="dot"></span>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          <form className="chat-input-bar" onSubmit={sendMessage}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Ask about this lead..."
-              disabled={loading}
-            />
-            <button type="submit" disabled={!input.trim() || loading}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </form>
-        </div>
-      )}
-    </>
-  )
-}
-
 function App() {
   const [leads, setLeads] = useState([])
   const [selectedLead, setSelectedLead] = useState(null)
@@ -205,6 +68,96 @@ function App() {
   const [importText, setImportText] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Editable prompt & email state
+  const [editingPrompt, setEditingPrompt] = useState(false)
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [promptDraft, setPromptDraft] = useState('')
+  const [emailSubjectDraft, setEmailSubjectDraft] = useState('')
+  const [emailBodyDraft, setEmailBodyDraft] = useState('')
+  const [aiLoading, setAiLoading] = useState(null) // 'prompt' | 'email' | null
+  const [customInstruction, setCustomInstruction] = useState('')
+
+  // Sync drafts when selected lead changes
+  useEffect(() => {
+    if (selectedLead) {
+      setPromptDraft(selectedLead.lovablePrompt || '')
+      setEmailSubjectDraft(selectedLead.emailSubject || '')
+      setEmailBodyDraft(selectedLead.emailBody || '')
+      setEditingPrompt(false)
+      setEditingEmail(false)
+      setCustomInstruction('')
+    }
+  }, [selectedLead?.id])
+
+  // Save edits to Supabase and update local state
+  async function saveField(field, value) {
+    const dbField = field === 'lovablePrompt' ? 'lovable_prompt'
+      : field === 'emailSubject' ? 'email_subject'
+      : field === 'emailBody' ? 'email_body' : field
+
+    await supabase
+      .from('leads')
+      .update({ [dbField]: value, updated_at: new Date().toISOString() })
+      .eq('id', selectedLead.id)
+
+    const updated = { ...selectedLead, [field]: value }
+    setSelectedLead(updated)
+    setLeads(prev => prev.map(l => l.id === selectedLead.id ? updated : l))
+  }
+
+  // AI rewrite via serverless function
+  async function aiRewrite(type) {
+    setAiLoading(type)
+    const instruction = customInstruction.trim()
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: type === 'prompt'
+              ? `${instruction ? instruction : 'Rewrite and improve this Lovable build prompt. Make it more specific, actionable, and tailored to this business. Keep it as a Lovable prompt — instructions for building a website.'}
+
+Here is the current prompt to improve:
+${promptDraft || selectedLead.lovablePrompt || 'No prompt exists yet — generate one from scratch based on the lead data.'}`
+              : `${instruction ? instruction : 'Rewrite and improve this outreach email. Make it more personalized, compelling, and natural. Reference specific details about their business. Keep it professional but warm.'}
+
+Here is the current email to improve:
+Subject: ${emailSubjectDraft || selectedLead.emailSubject || 'None'}
+Body: ${emailBodyDraft || selectedLead.emailBody || 'No email exists yet — generate one from scratch based on the lead data.'}
+
+Return the result in this exact format:
+SUBJECT: <the subject line>
+BODY:
+<the email body>`
+          }],
+          lead: selectedLead,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.error) {
+        alert('AI error: ' + data.error)
+      } else if (type === 'prompt') {
+        setPromptDraft(data.text)
+      } else {
+        // Parse subject and body from response
+        const text = data.text
+        const subjectMatch = text.match(/SUBJECT:\s*(.+?)(?:\n|$)/)
+        const bodyMatch = text.match(/BODY:\s*\n?([\s\S]+)/)
+        if (subjectMatch) setEmailSubjectDraft(subjectMatch[1].trim())
+        if (bodyMatch) setEmailBodyDraft(bodyMatch[1].trim())
+        else setEmailBodyDraft(text)
+      }
+    } catch (err) {
+      alert('Failed to connect: ' + err.message)
+    }
+    setAiLoading(null)
+    setCustomInstruction('')
+  }
 
   // Load leads from Supabase on mount
   useEffect(() => {
@@ -580,50 +533,215 @@ function App() {
               </div>
             )}
 
-            {/* Lovable Prompt */}
-            {selectedLead.lovablePrompt && (
+            {/* Lovable Prompt — Editable + AI Rewrite */}
+            {(selectedLead.lovablePrompt || editingPrompt) && (
               <div className="detail-section">
-                <h3>Lovable Prompt</h3>
-                <div className="prompt-box">
-                  <pre>{selectedLead.lovablePrompt}</pre>
+                <div className="section-header-row">
+                  <h3>Lovable Prompt</h3>
+                  <div className="section-actions">
+                    {!editingPrompt && (
+                      <button className="btn-icon" onClick={() => setEditingPrompt(true)} title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  className="btn-primary copy-btn"
-                  onClick={() => copyText(selectedLead.lovablePrompt, 'prompt')}
-                >
-                  {copiedPrompt ? 'Copied!' : 'Copy Prompt'}
-                </button>
-                <a
-                  href="https://lovable.dev/projects"
-                  target="_blank"
-                  rel="noopener"
-                  className="btn-secondary lovable-link"
-                >
-                  Open Lovable
-                </a>
+
+                {editingPrompt ? (
+                  <>
+                    <textarea
+                      className="editable-textarea"
+                      value={promptDraft}
+                      onChange={e => setPromptDraft(e.target.value)}
+                      rows={12}
+                    />
+                    <div className="ai-instruction-row">
+                      <input
+                        type="text"
+                        className="ai-instruction-input"
+                        value={customInstruction}
+                        onChange={e => setCustomInstruction(e.target.value)}
+                        placeholder="Optional: tell AI how to rewrite (e.g. 'make it shorter', 'add booking system')"
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aiRewrite('prompt') } }}
+                      />
+                      <button
+                        className="btn-ai"
+                        onClick={() => aiRewrite('prompt')}
+                        disabled={aiLoading === 'prompt'}
+                      >
+                        {aiLoading === 'prompt' ? (
+                          <><span className="spinner"></span> Rewriting...</>
+                        ) : (
+                          <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> AI Rewrite</>
+                        )}
+                      </button>
+                    </div>
+                    <div className="edit-actions">
+                      <button className="btn-primary" onClick={() => {
+                        saveField('lovablePrompt', promptDraft)
+                        setEditingPrompt(false)
+                      }}>Save</button>
+                      <button className="btn-secondary" onClick={() => {
+                        setPromptDraft(selectedLead.lovablePrompt || '')
+                        setEditingPrompt(false)
+                        setCustomInstruction('')
+                      }}>Cancel</button>
+                      <button
+                        className="btn-primary copy-btn"
+                        onClick={() => copyText(promptDraft, 'prompt')}
+                      >
+                        {copiedPrompt ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="prompt-box">
+                      <pre>{selectedLead.lovablePrompt}</pre>
+                    </div>
+                    <div className="edit-actions">
+                      <button
+                        className="btn-primary copy-btn"
+                        onClick={() => copyText(selectedLead.lovablePrompt, 'prompt')}
+                      >
+                        {copiedPrompt ? 'Copied!' : 'Copy Prompt'}
+                      </button>
+                      <button className="btn-secondary" onClick={() => setEditingPrompt(true)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn-ai"
+                        onClick={() => { setEditingPrompt(true); setTimeout(() => aiRewrite('prompt'), 100) }}
+                        disabled={aiLoading === 'prompt'}
+                      >
+                        {aiLoading === 'prompt' ? (
+                          <><span className="spinner"></span> Rewriting...</>
+                        ) : (
+                          <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> AI Rewrite</>
+                        )}
+                      </button>
+                      <a
+                        href="https://lovable.dev/projects"
+                        target="_blank"
+                        rel="noopener"
+                        className="btn-secondary lovable-link"
+                      >
+                        Open Lovable
+                      </a>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* Draft Email */}
-            {selectedLead.emailBody && (
+            {/* Draft Email — Editable + AI Rewrite */}
+            {(selectedLead.emailBody || editingEmail) && (
               <div className="detail-section">
-                <h3>Draft Outreach Email</h3>
-                <div className="email-notice">This is a draft. It will NOT be sent without your approval.</div>
-                {selectedLead.emailSubject && (
-                  <div className="email-subject">Subject: {selectedLead.emailSubject}</div>
-                )}
-                <div className="prompt-box">
-                  <pre>{selectedLead.emailBody}</pre>
+                <div className="section-header-row">
+                  <h3>Draft Outreach Email</h3>
+                  <div className="section-actions">
+                    {!editingEmail && (
+                      <button className="btn-icon" onClick={() => setEditingEmail(true)} title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  className="btn-primary copy-btn"
-                  onClick={() => copyText(
-                    `Subject: ${selectedLead.emailSubject || ''}\n\n${selectedLead.emailBody}`,
-                    'email'
-                  )}
-                >
-                  {copiedEmail ? 'Copied!' : 'Copy Email Draft'}
-                </button>
+                <div className="email-notice">This is a draft. It will NOT be sent without your approval.</div>
+
+                {editingEmail ? (
+                  <>
+                    <div className="email-field">
+                      <label className="email-field-label">Subject</label>
+                      <input
+                        type="text"
+                        className="editable-input"
+                        value={emailSubjectDraft}
+                        onChange={e => setEmailSubjectDraft(e.target.value)}
+                      />
+                    </div>
+                    <div className="email-field">
+                      <label className="email-field-label">Body</label>
+                      <textarea
+                        className="editable-textarea"
+                        value={emailBodyDraft}
+                        onChange={e => setEmailBodyDraft(e.target.value)}
+                        rows={10}
+                      />
+                    </div>
+                    <div className="ai-instruction-row">
+                      <input
+                        type="text"
+                        className="ai-instruction-input"
+                        value={customInstruction}
+                        onChange={e => setCustomInstruction(e.target.value)}
+                        placeholder="Optional: tell AI how to rewrite (e.g. 'more casual', 'mention their 5-star rating')"
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aiRewrite('email') } }}
+                      />
+                      <button
+                        className="btn-ai"
+                        onClick={() => aiRewrite('email')}
+                        disabled={aiLoading === 'email'}
+                      >
+                        {aiLoading === 'email' ? (
+                          <><span className="spinner"></span> Rewriting...</>
+                        ) : (
+                          <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> AI Rewrite</>
+                        )}
+                      </button>
+                    </div>
+                    <div className="edit-actions">
+                      <button className="btn-primary" onClick={() => {
+                        saveField('emailSubject', emailSubjectDraft)
+                        saveField('emailBody', emailBodyDraft)
+                        setEditingEmail(false)
+                      }}>Save</button>
+                      <button className="btn-secondary" onClick={() => {
+                        setEmailSubjectDraft(selectedLead.emailSubject || '')
+                        setEmailBodyDraft(selectedLead.emailBody || '')
+                        setEditingEmail(false)
+                        setCustomInstruction('')
+                      }}>Cancel</button>
+                      <button
+                        className="btn-primary copy-btn"
+                        onClick={() => copyText(`Subject: ${emailSubjectDraft}\n\n${emailBodyDraft}`, 'email')}
+                      >
+                        {copiedEmail ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {selectedLead.emailSubject && (
+                      <div className="email-subject">Subject: {selectedLead.emailSubject}</div>
+                    )}
+                    <div className="prompt-box">
+                      <pre>{selectedLead.emailBody}</pre>
+                    </div>
+                    <div className="edit-actions">
+                      <button
+                        className="btn-primary copy-btn"
+                        onClick={() => copyText(`Subject: ${selectedLead.emailSubject || ''}\n\n${selectedLead.emailBody}`, 'email')}
+                      >
+                        {copiedEmail ? 'Copied!' : 'Copy Email'}
+                      </button>
+                      <button className="btn-secondary" onClick={() => setEditingEmail(true)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn-ai"
+                        onClick={() => { setEditingEmail(true); setTimeout(() => aiRewrite('email'), 100) }}
+                        disabled={aiLoading === 'email'}
+                      >
+                        {aiLoading === 'email' ? (
+                          <><span className="spinner"></span> Rewriting...</>
+                        ) : (
+                          <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> AI Rewrite</>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -651,9 +769,6 @@ function App() {
             )}
           </div>
         )}
-
-        {/* Chat Widget — only on lead detail */}
-        {selectedLead && <ChatWidget lead={selectedLead} />}
 
         {/* Empty state */}
         {leads.length === 0 && !selectedLead && (
