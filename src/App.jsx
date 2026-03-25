@@ -20,12 +20,20 @@ function App() {
   const [importText, setImportText] = useState('')
   const [showImport, setShowImport] = useState(false)
 
-  // Load leads from localStorage on mount
+  // Load leads from localStorage on mount + listen for extension injections
   useEffect(() => {
-    const saved = localStorage.getItem('sitescout_leads')
-    if (saved) {
-      try { setLeads(JSON.parse(saved)) } catch {}
+    const loadFromStorage = () => {
+      const saved = localStorage.getItem('sitescout_leads')
+      if (saved) {
+        try { setLeads(JSON.parse(saved)) } catch {}
+      }
     }
+    loadFromStorage()
+
+    // Listen for storage events (fired when extension injects leads)
+    const onStorage = () => loadFromStorage()
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   // Save leads to localStorage on change
@@ -39,7 +47,11 @@ function App() {
   function handleImport() {
     try {
       const parsed = JSON.parse(importText)
-      const newLeads = Array.isArray(parsed) ? parsed : [parsed]
+      const newLeads = (Array.isArray(parsed) ? parsed : [parsed]).map(l => ({
+        ...l,
+        id: l.id || crypto.randomUUID(),
+        status: l.status || 'scraped',
+      }))
       setLeads(prev => {
         const existing = new Set(prev.map(l => l.businessName?.toLowerCase()))
         const unique = newLeads.filter(l => !existing.has(l.businessName?.toLowerCase()))
@@ -48,7 +60,7 @@ function App() {
       setImportText('')
       setShowImport(false)
     } catch {
-      alert('Invalid JSON — copy leads from the extension')
+      alert('Invalid JSON — use "Copy All as JSON" button in the extension')
     }
   }
 
@@ -115,7 +127,7 @@ function App() {
         <div className="import-modal">
           <div className="import-content">
             <h3>Import Leads from Extension</h3>
-            <p>Open the extension popup → Leads tab → right-click → Inspect → Console → type: <code>chrome.storage.local.get(['leads'], r =&gt; copy(r.leads))</code> → paste below</p>
+            <p>In the extension popup, go to Leads tab and click <strong>"Copy All as JSON"</strong>, then paste below. Or click <strong>"Send to CRM"</strong> in the extension to auto-import.</p>
             <textarea
               value={importText}
               onChange={e => setImportText(e.target.value)}
